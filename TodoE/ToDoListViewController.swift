@@ -17,6 +17,8 @@ class ToDoListViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        
+        // Retrieving data into plist file (if it exists)
         if let items = defaults.stringArray(forKey: "ToDoListArray"){
             itemArray = items
         }
