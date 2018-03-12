@@ -7,25 +7,31 @@
 //
 
 import UIKit
+import CoreData
+
+//MARK: - Begining with ViewController definition
 
 class ToDoListViewController: UITableViewController {
 
     // Defining data paths
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    // let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
+    
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+
     
     // Creating an array of objects of class item, defined in item.swift
     var itemArray = [Item]()
     
     // Default settings variable
-    let defaults = UserDefaults.standard
+    // let defaults = UserDefaults.standard
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Retrieving data into plist file (if it exists)
-        if let items = defaults.array(forKey: "ToDoListArray") as? [Item]{
-            itemArray = items
-        }
+        // if let items = defaults.array(forKey: "ToDoListArray") as? [Item]{
+        //    itemArray = items
+        //}
         
         // Using newly defined hard coded data type item
 //        let newItem = Item()
@@ -33,10 +39,17 @@ class ToDoListViewController: UITableViewController {
 //        itemArray.append(newItem)
         
         loadItems()
+        print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
+        
+        // Delegating searchBar
+        // searchBar.delegate = self
+        
         
     }
     
-    //MARK - TableView DataSource Methods
+    //@IBOutlet weak var searchBar: UISearchBar!
+    
+    //MARK: - TableView DataSource Methods
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return itemArray.count
     }
@@ -52,9 +65,13 @@ class ToDoListViewController: UITableViewController {
         return cell
     }
     
-    //MARK - TableView Delegate Methods
+    //MARK: - TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         print(itemArray[indexPath.row])
+        
+        // If one wants to phisically delete items from database. Order MATTERS!
+//        context.delete(itemArray[indexPath.row])
+//        itemArray.remove(at: indexPath.row)
         
         itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
@@ -72,16 +89,18 @@ class ToDoListViewController: UITableViewController {
         
     }
     
-    // MARK - Add New Items
+    // MARK: - Add New Items
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         
         var textField = UITextField()
         
         let alert = UIAlertController(title: "Add nem Event", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add Item", style: .default) {(action) in
+            
             // Using with changes made in lecture 249, Section 19
-            let newItem = Item()
+            let newItem = Item(context: self.context)
             newItem.title = textField.text!
+            newItem.done = false
             
             // What happens when user clicks "+" button
             self.itemArray.append(newItem)
@@ -100,32 +119,57 @@ class ToDoListViewController: UITableViewController {
         present(alert, animated: true, completion: nil)
     }
     
+    // MARK: - Manipulating data in the database level
+    
     func saveItems () {
-        let encoder = PropertyListEncoder()
+        // let encoder = PropertyListEncoder() deleted after lecture 250, section 19
         
         do {
-            let data = try encoder.encode(itemArray)
-            try data.write(to: dataFilePath!)
+            try context.save()
         } catch {
-            print("Error encoding item array, \(error)!")
+    
         }
         
         // Reloading UITableView data
         tableView.reloadData()
     }
     
-    func loadItems () {
-        if let data = try? Data(contentsOf: dataFilePath!) {
-            let decoder = PropertyListDecoder()
-            do {
-            itemArray = try decoder.decode([Item].self, from: data)
-            } catch {
-                
+    func loadItems (with request: NSFetchRequest<Item> = Item.fetchRequest()) {
+        // New on lecture 253, Section 19
+        // let request : NSFetchRequest<Item> = Item.fetchRequest()
+        do {
+            itemArray = try context.fetch(request)
+        } catch {
+            print("Error fetching data from context! \(error)")
+        }
+    }
+}
+
+//MARK: - Search database
+
+extension ToDoListViewController: UISearchBarDelegate {
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] $@", searchBar.text!)
+        
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItems(with: request)
+    }
+    
+//    func searchBar(searchBar: UISearchBar, textDidChange searchText: String) {
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            // Send the focus to the main controller
+            DispatchQueue.main.async {
+            searchBar.resignFirstResponder()
             }
         }
     }
-    
-    
 }
 
 
