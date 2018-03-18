@@ -7,13 +7,16 @@
 //
 
 import UIKit
-import CoreData
+// import CoreData
+import RealmSwift
 
 class CategoryViewController: UITableViewController {
     
-    var categoryArray = [Category]()
+    let realm = try! Realm()
     
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    var categoryArray: Results<CategoryTb>?
+    
+//    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     // Creating an array of objects of class Category, defined in item.swift
     
     override func viewDidLoad() {
@@ -24,26 +27,33 @@ class CategoryViewController: UITableViewController {
     }
 
     func loadCategories (){
-        let request : NSFetchRequest<Category> = Category.fetchRequest()
         
-        do {
-            categoryArray = try context.fetch(request)
-        } catch {
-            print("Error loading Categories: \(error)")
-        }
+        categoryArray = realm.objects(CategoryTb.self)
         
         tableView.reloadData()
+        
+        // Below, using Core Data
+//        let request : NSFetchRequest<Category> = Category.fetchRequest()
+//
+//        do {
+//            categoryArray = try context.fetch(request)
+//        } catch {
+//            print("Error loading Categories: \(error)")
+//        }
+//
+
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return categoryArray.count
+        // Using the nil coalescing operator "??"
+        return categoryArray?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "CategoryCell", for: indexPath)
         
-        cell.textLabel?.text = categoryArray[indexPath.row].name
+        cell.textLabel?.text = categoryArray?[indexPath.row].category ?? "No Categories Added..."
         
         return cell
     }
@@ -51,20 +61,21 @@ class CategoryViewController: UITableViewController {
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
         var textFieldCategory = UITextField()
         
-        let alertCategory = UIAlertController(title: "Add New Categoty", message: "", preferredStyle: .alert)
+        let alertCategory = UIAlertController(title: "Add New Category", message: "", preferredStyle: .alert)
         
         let actionCategory = UIAlertAction(title: "Add!", style: .default) {(action) in
             
             // Using with changes made in lecture 249, Section 19
-            let newCategory = Category(context: self.context)
-            newCategory.name = textFieldCategory.text!
+            let newCategory = CategoryTb()
+         
+            newCategory.category = textFieldCategory.text!
             //newCategory.done = false
             
             // What happens when user clicks "+" button
-            self.categoryArray.append(newCategory)
+            // self.categoryArray.append(newCategory)
             
             // Calling saveCategory() to append data
-            self.saveCategory()
+            self.save(category: newCategory)
             
         }
         alertCategory.addTextField { (alertTextField) in
@@ -80,22 +91,24 @@ class CategoryViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
         performSegue(withIdentifier: "goToItems", sender: self)
-        print(categoryArray[indexPath.row])
+        //print(categoryArray[indexPath.row])
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         let destinationVC = segue.destination as! ToDoListViewController
         if let indexPath = tableView.indexPathForSelectedRow {
-            destinationVC.selectedCategory = categoryArray[indexPath.row]
+            destinationVC.selectedCategory = categoryArray?[indexPath.row]
         }
     }
     
     // MARK: - Data manipulation
     
     // Method
-    func saveCategory (){
+    func save(category: CategoryTb){
         do {
-            try context.save()
+            try realm.write {
+                realm.add(category)
+            }
         } catch {
             print("Error saving new Category: \(error)")
         }
